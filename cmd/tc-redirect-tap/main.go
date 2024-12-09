@@ -174,13 +174,12 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 func getCurrentResult(args *skel.CmdArgs) (*current.Result, error) {
 	// parse the previous CNI result (or throw an error if there wasn't one)
 	cniConf := types.NetConf{}
-	err := json.Unmarshal(args.StdinData, &cniConf)
-	if err != nil {
+
+	if err := json.Unmarshal(args.StdinData, &cniConf); err != nil {
 		return nil, fmt.Errorf("failure checking for previous result output: %w", err)
 	}
 
-	err = version.ParsePrevResult(&cniConf)
-	if err != nil {
+	if err := version.ParsePrevResult(&cniConf); err != nil {
 		return nil, fmt.Errorf("failed to parse previous CNI result: %w", err)
 	}
 

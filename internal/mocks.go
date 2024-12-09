@@ -112,6 +112,7 @@ func (m *MockNetlinkOps) RemoveLink(name string) error {
 	}
 
 	m.RemoveLinkCalls = append(m.RemoveLinkCalls, name)
+
 	switch name {
 	case m.RedirectIface.Attrs().Name:
 		return nil
