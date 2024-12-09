@@ -105,25 +105,13 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 	}
 
 	netNS, err := ns.GetNS(args.Netns)
-	if err != nil {
-		// It's valid for the netns to no longer exist during DEL commands (in which case DEL is
-		// a noop). Thus, we leave validating that netNS is not nil to command implementations.
-		switch err.(type) {
-		case ns.NSPathNotExistErr:
-			netNS = nil
-		default:
-			return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
-		}
+	if err != nil && !errors.Is(err, ns.NSPathNotExistErr{}) {
+		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
 	}
 
 	currentResult, err := getCurrentResult(args)
-	if err != nil {
-		switch err.(type) {
-		case *NoPreviousResultError:
-			currentResult = nil
-		default:
-			return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
-		}
+	if err != nil && !errors.Is(err, &NoPreviousResultError{}) {
+		return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
 	}
 
 	plugin := &plugin{
