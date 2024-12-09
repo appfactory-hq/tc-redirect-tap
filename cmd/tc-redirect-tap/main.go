@@ -104,9 +104,9 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 	}
 
 	netNS, err := ns.GetNS(args.Netns)
-	if err != nil && !errors.Is(err, ns.NSPathNotExistErr) {
+	if err != nil && !errors.Is(err, ns.NSPathNotExistErr{}) {
 		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
-	} else if errors.Is(err, ns.NSPathNotExistErr) {
+	} else if errors.Is(err, ns.NSPathNotExistErr{}) {
 		netNS = nil
 	}
 
