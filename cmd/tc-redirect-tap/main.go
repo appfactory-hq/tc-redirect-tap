@@ -215,6 +215,7 @@ type plugin struct {
 	currentResult *current.Result
 }
 
+// nolint:wrapcheck
 func (p plugin) add() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
@@ -283,9 +284,10 @@ func (p plugin) add() error {
 		}
 
 		return nil
-	}) // nolint:wrapcheck
+	})
 }
 
+// nolint:wrapcheck
 func (p plugin) del() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
 		var multiErr *multierror.Error
@@ -323,7 +325,7 @@ func (p plugin) del() error {
 		}
 
 		return multiErr.ErrorOrNil()
-	}) // nolint:wrapcheck
+	})
 }
 
 // nolint:wrapcheck
