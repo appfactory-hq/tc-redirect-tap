@@ -293,18 +293,20 @@ func (p plugin) add() error {
 // nolint:wrapcheck
 func (p plugin) del() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
+		var linkNotFoundError *internal.LinkNotFoundError
+		var qdiscNotFoundError *internal.QdiscNotFoundError
 		var multiErr error
 
 		// try to remove the qdisc we added from the redirect interface
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
-		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
+		if err != nil && !errors.As(err, &linkNotFoundError) {
 			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failure finding device %q: %w", p.redirectInterfaceName, err),
 			)
 		}
 
 		// the link exists, so try removing the qdisc
-		if err := p.RemoveIngressQdisc(redirectLink); err != nil && !errors.Is(err, &internal.QdiscNotFoundError{}) {
+		if err := p.RemoveIngressQdisc(redirectLink); err != nil && !errors.As(err, &qdiscNotFoundError) {
 			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
 			)
@@ -317,11 +319,11 @@ func (p plugin) del() error {
 
 		// try to remove the tap device we added
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
-		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
+		if err != nil && !errors.As(err, &linkNotFoundError) {
 			multiErr = errors.Join(multiErr, err)
 		}
 
-		if err = p.RemoveLink(tapIface.Name); err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
+		if err = p.RemoveLink(tapIface.Name); err != nil && !errors.As(err, &linkNotFoundError) {
 			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failed to remove device %q: %w", tapIface.Name, err),
 			)
