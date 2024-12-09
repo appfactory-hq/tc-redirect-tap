@@ -95,6 +95,8 @@ type StaticNetworkConf struct {
 //   - VMDomain, VMSearchDomains and VMResolverOptions will be ignored
 //   - Nameserver settings are also only set in /proc/net/pnp. Most applications will thus require
 //     /etc/resolv.conf to be a symlink to /proc/net/pnp in order to resolve names as expected.
+//
+// nolint:wsl
 func (c StaticNetworkConf) IPBootParam() string {
 	// See "ip=" section of kernel linked above for details on each field listed below.
 
@@ -127,7 +129,7 @@ func (c StaticNetworkConf) IPBootParam() string {
 
 	// up to two nameservers (if any were provided)
 	var nameservers [2]string
-	copy(nameservers[:], c.VMNameservers)
+	_ = copy(nameservers[:], c.VMNameservers)
 
 	// TODO(sipsma) should we support configuring an NTP server?
 	const ntpServer = ""
@@ -172,6 +174,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 		return nil, fmt.Errorf("expected to find 1 IP for vm interface %q, but instead found %+v",
 			vmIface.Name, vmIPs)
 	}
+
 	vmIP := vmIPs[0]
 
 	netNS, err := ns.GetNS(tapIface.Sandbox)
