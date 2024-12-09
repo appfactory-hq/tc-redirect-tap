@@ -326,6 +326,7 @@ func (p plugin) del() error {
 	}) // nolint:wrapcheck
 }
 
+// nolint:wrapcheck
 func (p plugin) check() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
@@ -364,7 +365,7 @@ func (p plugin) check() error {
 		}
 
 		return nil
-	}) // nolint:wrapcheck
+	})
 }
 
 type NoPreviousResultError struct{}
