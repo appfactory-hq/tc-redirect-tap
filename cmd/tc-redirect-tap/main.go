@@ -103,17 +103,14 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 		return nil, errors.New("no device to redirect with was found, was IfName specified?")
 	}
 
-	var (
-		nsPathNotExistErr     *ns.NSPathNotExistErr
-		noPreviousResultError *NoPreviousResultError
-	)
-
 	netNS, err := ns.GetNS(args.Netns)
-	if err != nil && !errors.As(err, &nsPathNotExistErr) {
+	if err != nil && !errors.Is(err, ns.NSPathNotExistErr) {
 		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
-	} else if errors.As(err, &nsPathNotExistErr) {
+	} else if errors.Is(err, ns.NSPathNotExistErr) {
 		netNS = nil
 	}
+
+	var noPreviousResultError *NoPreviousResultError
 
 	currentResult, err := getCurrentResult(args)
 	if err != nil && !errors.As(err, &noPreviousResultError) {
