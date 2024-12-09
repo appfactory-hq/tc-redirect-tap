@@ -200,16 +200,17 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 func mtuOf(ifaceName string, netNS ns.NetNS, netlinkOps internal.NetlinkOps) (int, error) {
 	var mtu int
-	err := netNS.Do(func(_ ns.NetNS) error {
+
+	if err := netNS.Do(func(_ ns.NetNS) error {
 		link, err := netlinkOps.GetLink(ifaceName)
 		if err != nil {
 			return fmt.Errorf("failed to find device %q in netns %q: %w", ifaceName, netNS.Path(), err)
 		}
+
 		mtu = link.Attrs().MTU
 
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return 0, fmt.Errorf("failed to find MTU: %w", err)
 	}
 
