@@ -293,9 +293,11 @@ func (p plugin) add() error {
 // nolint:wrapcheck
 func (p plugin) del() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
-		var linkNotFoundError *internal.LinkNotFoundError
-		var qdiscNotFoundError *internal.QdiscNotFoundError
-		var multiErr error
+		var (
+			linkNotFoundError  *internal.LinkNotFoundError
+			qdiscNotFoundError *internal.QdiscNotFoundError
+			multiErr           error
+		)
 
 		// try to remove the qdisc we added from the redirect interface
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
