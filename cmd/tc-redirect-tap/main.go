@@ -283,7 +283,7 @@ func (p plugin) add() error {
 		}
 
 		return nil
-	})
+	}) // nolint:wrapcheck
 }
 
 func (p plugin) del() error {
@@ -323,7 +323,7 @@ func (p plugin) del() error {
 		}
 
 		return multiErr.ErrorOrNil()
-	})
+	}) // nolint:wrapcheck
 }
 
 func (p plugin) check() error {
