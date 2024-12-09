@@ -52,7 +52,7 @@ func FilterBySandbox(
 	return
 }
 
-// IfacesWithName scans the provided list of ifaces and returns the ones with the provided name
+// IfacesWithName scans the provided list of ifaces and returns the ones with the provided name.
 func IfacesWithName(name string, ifaces ...*current.Interface) []*current.Interface {
 	var foundIfaces []*current.Interface
 	for _, iface := range ifaces {

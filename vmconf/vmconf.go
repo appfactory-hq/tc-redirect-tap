@@ -163,7 +163,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 	vmIface, tapIface, err := internal.VMTapPair(currentResult, vmIfaceSandbox)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find vm/tap pair: %w", err)
 	}
 
 	// find the IP associated with the VM iface
@@ -181,7 +181,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 	tapMTU, err := mtuOf(tapIface.Name, netNS, internal.DefaultNetlinkOps())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find MTU of tap device: %w", err)
 	}
 
 	return &StaticNetworkConf{

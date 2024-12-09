@@ -22,7 +22,7 @@ import (
 )
 
 // RootFilterHandle returns a u32 filter handle representing the root of the Qdisc. It's defined as
-// a func so it can be immutable even though the value is retrieved through the netlink library
+// a func so it can be immutable even though the value is retrieved through the netlink library.
 func RootFilterHandle() uint32 {
 	return netlink.MakeHandle(0xffff, 0)
 }
@@ -37,7 +37,7 @@ func RootFilterHandle() uint32 {
 // can be found here:
 // * Qdiscs+filters: http://tldp.org/HOWTO/Traffic-Control-HOWTO/components.html
 // * U32 Filters: http://man7.org/linux/man-pages/man8/tc-u32.8.html
-// * Using u32 redirects with taps: https://gist.github.com/mcastelino/7d85f4164ffdaf48242f9281bb1d0f9b
+// * Using u32 redirects with taps: https://gist.github.com/mcastelino/7d85f4164ffdaf48242f9281bb1d0f9b.
 type NetlinkOps interface {
 	// CreateTap will create a tap device configured as expected by the tc-redirect-tap plugin for
 	// use by a Firecracker VM. It sets the tap in the up state and with the provided MTU.
@@ -45,9 +45,11 @@ type NetlinkOps interface {
 
 	// AddIngressQdisc adds a qdisc to the ingress queue of the provided device.
 	AddIngressQdisc(link netlink.Link) error
+
 	// GetIngressQdisc looks for an ingress qdisc matching the one added by AddIngressQdisc,
-	// returning it if found. If not found, it returns a QdiscNotFoundError
+	// returning it if found. If not found, it returns a QdiscNotFoundError.
 	GetIngressQdisc(link netlink.Link) (netlink.Qdisc, error)
+
 	// RemoveIngressQdisc removes the ingress qdisc added by AddIngressQdisc from the provided
 	// device. It returns a QdiscNotFoundError if the expected qdisc is not attached to the
 	// provided device.
@@ -57,16 +59,18 @@ type NetlinkOps interface {
 	// packets from its ingress queue to the egress queue of the provided targetLink. It requires
 	// that sourceLink have an ingress qdisc attached prior to the call.
 	AddRedirectFilter(sourceLink netlink.Link, targetLink netlink.Link) error
+
 	// GetRedirectFilter looks for a u32 redirect filter matching the one added by
-	// AddRedirectFilter, returning it if found. If not found, it returns a FilterNotFoundError
+	// AddRedirectFilter, returning it if found. If not found, it returns a FilterNotFoundError.
 	GetRedirectFilter(sourceLink netlink.Link, targetLink netlink.Link) (netlink.Filter, error)
 
 	// GetLink returns the netlink.Link for the device with the provided name, or a
 	// LinkNotFoundError if no such device is found in the network namespace in which the call is
 	// executed.
 	GetLink(name string) (netlink.Link, error)
+
 	// RemoveLink deletes the link with the provided device name. It returns LinkNotFoundError if
-	// the link doesn't exist
+	// the link doesn't exist.
 	RemoveLink(name string) error
 }
 
@@ -92,7 +96,7 @@ func (ops defaultNetlinkOps) AddIngressQdisc(link netlink.Link) error {
 func (ops defaultNetlinkOps) RemoveIngressQdisc(link netlink.Link) error {
 	qdisc, err := ops.GetIngressQdisc(link)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get ingress qdisc from device %q: %w", link.Attrs().Name, err)
 	}
 
 	err = netlink.QdiscDel(qdisc)
@@ -152,7 +156,7 @@ func (ops defaultNetlinkOps) AddRedirectFilter(sourceLink netlink.Link, targetLi
 		)
 	}
 
-	return err
+	return err // nolint:wrapcheck
 }
 
 func (ops defaultNetlinkOps) GetRedirectFilter(sourceLink netlink.Link, targetLink netlink.Link) (netlink.Filter, error) {
@@ -180,20 +184,21 @@ func (defaultNetlinkOps) GetLink(name string) (netlink.Link, error) {
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
 		return nil, &LinkNotFoundError{device: name}
 	}
-	return link, err
+	return link, fmt.Errorf("failed to get link %q: %w", name, err)
 }
 
 func (ops defaultNetlinkOps) RemoveLink(name string) error {
 	link, err := ops.GetLink(name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get link %q: %w", name, err)
 	}
 
 	err = netlink.LinkDel(link)
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
 		return &LinkNotFoundError{device: link.Attrs().Name}
 	}
-	return err
+
+	return err // nolint:wrapcheck
 }
 
 func (defaultNetlinkOps) CreateTap(name string, mtu int, ownerUID, ownerGID int) (netlink.Link, error) {
