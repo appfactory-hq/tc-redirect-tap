@@ -64,7 +64,7 @@ func add(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to add tap device: %w", err)
 	}
 
-	return types.PrintResult(p.currentResult, p.currentResult.CNIVersion)
+	return types.PrintResult(p.currentResult, p.currentResult.CNIVersion) // nolint:wrapcheck
 }
 
 func del(args *skel.CmdArgs) error {
@@ -79,7 +79,7 @@ func del(args *skel.CmdArgs) error {
 		return nil
 	}
 
-	return p.del()
+	return p.del() // nolint:wrapcheck
 }
 
 func check(args *skel.CmdArgs) error {
@@ -96,7 +96,7 @@ func check(args *skel.CmdArgs) error {
 		return &NoPreviousResultError{}
 	}
 
-	return p.check()
+	return p.check() // nolint:wrapcheck
 }
 
 func newPlugin(args *skel.CmdArgs) (*plugin, error) {
@@ -336,7 +336,6 @@ func (p plugin) del() error {
 		// try to remove the tap device we added
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
 		switch err.(type) {
-
 		case nil:
 			err = p.RemoveLink(tapIface.Name)
 			switch err.(type) {
@@ -397,7 +396,7 @@ func (p plugin) check() error {
 		}
 
 		return nil
-	})
+	}) // nolint:wrapcheck
 }
 
 type NoPreviousResultError struct{}

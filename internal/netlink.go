@@ -184,7 +184,8 @@ func (defaultNetlinkOps) GetLink(name string) (netlink.Link, error) {
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
 		return nil, &LinkNotFoundError{device: name}
 	}
-	return link, fmt.Errorf("failed to get link %q: %w", name, err)
+
+	return link, err // nolint:wrapcheck
 }
 
 func (ops defaultNetlinkOps) RemoveLink(name string) error {

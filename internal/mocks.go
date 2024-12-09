@@ -73,6 +73,7 @@ func (m *MockNetlinkOps) GetIngressQdisc(sourceLink netlink.Link) (netlink.Qdisc
 // RemoveIngressQdisc does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) RemoveIngressQdisc(sourceLink netlink.Link) error {
 	m.RemoveIngressQdiscCalls = append(m.RemoveIngressQdiscCalls, sourceLink)
+
 	return m.RemoveIngressQdiscErr
 }
 
