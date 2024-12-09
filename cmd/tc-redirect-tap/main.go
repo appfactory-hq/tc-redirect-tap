@@ -103,17 +103,22 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 		return nil, errors.New("no device to redirect with was found, was IfName specified?")
 	}
 
+	var (
+		nsPathNotExistErr     *ns.NSPathNotExistErr
+		noPreviousResultError *NoPreviousResultError
+	)
+
 	netNS, err := ns.GetNS(args.Netns)
-	if err != nil && !errors.Is(err, ns.NSPathNotExistErr{}) {
+	if err != nil && !errors.As(err, &nsPathNotExistErr) {
 		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
-	} else if errors.Is(err, ns.NSPathNotExistErr{}) {
+	} else if errors.As(err, &nsPathNotExistErr) {
 		netNS = nil
 	}
 
 	currentResult, err := getCurrentResult(args)
-	if err != nil && !errors.Is(err, &NoPreviousResultError{}) {
+	if err != nil && !errors.As(err, &noPreviousResultError) {
 		return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
-	} else if errors.Is(err, &NoPreviousResultError{}) {
+	} else if errors.As(err, &noPreviousResultError) {
 		currentResult = nil
 	}
 
