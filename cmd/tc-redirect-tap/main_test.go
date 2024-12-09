@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
 
-	"github.com/awslabs/tc-redirect-tap/internal"
+	"github.com/appfactory-hq/tc-redirect-tap/internal"
 )
 
 const (
