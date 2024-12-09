@@ -304,26 +304,16 @@ func (p plugin) del() error {
 
 		// try to remove the qdisc we added from the redirect interface
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
-		switch err.(type) {
-
-		case nil:
-			// the link exists, so try removing the qdisc
-			err := p.RemoveIngressQdisc(redirectLink)
-			switch err.(type) {
-			case nil, *internal.QdiscNotFoundError:
-				// we removed successfully or there already wasn't a qdisc, nothing to do
-			default:
-				multiErr = multierror.Append(multiErr,
-					fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
-				)
-			}
-
-		case *internal.LinkNotFoundError:
-			// if the link doesn't exist, there's nothing to do
-
-		default:
+		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
 			multiErr = multierror.Append(multiErr,
 				fmt.Errorf("failure finding device %q: %w", p.redirectInterfaceName, err),
+			)
+		}
+
+		// the link exists, so try removing the qdisc
+		if err := p.RemoveIngressQdisc(redirectLink); err != nil && !errors.Is(err, &internal.QdiscNotFoundError{}) {
+			multiErr = multierror.Append(multiErr,
+				fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
 			)
 		}
 
@@ -334,23 +324,14 @@ func (p plugin) del() error {
 
 		// try to remove the tap device we added
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
-		switch err.(type) {
-		case nil:
-			err = p.RemoveLink(tapIface.Name)
-			switch err.(type) {
-			case nil, *internal.LinkNotFoundError:
-				// we removed successfully or someone else beat us to removing it first
-			default:
-				multiErr = multierror.Append(multiErr,
-					fmt.Errorf("failure removing device %q: %w", tapIface.Name, err),
-				)
-			}
-
-		case *internal.LinkNotFoundError:
-			// if the link doesn't exist, there's nothing to do
-
-		default:
+		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
 			multiErr = multierror.Append(multiErr, err)
+		}
+
+		if err = p.RemoveLink(tapIface.Name); err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
+			multiErr = multierror.Append(multiErr,
+				fmt.Errorf("failed to remove device %q: %w", tapIface.Name, err),
+			)
 		}
 
 		return multiErr.ErrorOrNil()
