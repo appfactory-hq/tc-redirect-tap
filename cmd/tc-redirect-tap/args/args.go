@@ -1,3 +1,4 @@
+// nolint: gosec
 package args
 
 const TCRedirectTapName = "TC_REDIRECT_TAP_NAME"

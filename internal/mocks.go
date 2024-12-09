@@ -18,74 +18,77 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// MockNetlinkOps provides a no-op implementation of the NetlinkOps interface
+// MockNetlinkOps provides a no-op implementation of the NetlinkOps interface.
 type MockNetlinkOps struct {
-	// CreatedTap is the mock tap device object that will be returned by the mock methods
+	// CreatedTap is the mock tap device object that will be returned by the mock methods.
 	CreatedTap netlink.Link
 
 	// RedirectIface is the mock device object that will be returned by the mock methods as the
 	// device with which the tap has a filter redirection with.
 	RedirectIface netlink.Link
 
-	// AddIngressQdiscErr is an error that will be returned from all AddIngressQdisc calls
+	// AddIngressQdiscErr is an error that will be returned from all AddIngressQdisc calls.
 	AddIngressQdiscErr error
 
-	// GetIngressQdiscErr is an error that will be returned from all GetIngressQdisc calls
+	// GetIngressQdiscErr is an error that will be returned from all GetIngressQdisc calls.
 	GetIngressQdiscErr error
 
-	// RemoveIngressQdiscErr is an error that will be returned from all RemoveIngressQdisc calls
+	// RemoveIngressQdiscErr is an error that will be returned from all RemoveIngressQdisc calls.
 	RemoveIngressQdiscErr error
-	// RemoveIngressQdiscCalls records the args provided to each call to RemoveIngressQdisc
+
+	// RemoveIngressQdiscCalls records the args provided to each call to RemoveIngressQdisc.
 	RemoveIngressQdiscCalls []netlink.Link
 
-	// AddRedirectFilterErr is an error that will be returned from all AddRedirectFilter calls
+	// AddRedirectFilterErr is an error that will be returned from all AddRedirectFilter calls.
 	AddRedirectFilterErr error
 
-	// GetRedirectFilterErr is an error that will be returned from all GetRedirectFilter calls
+	// GetRedirectFilterErr is an error that will be returned from all GetRedirectFilter calls.
 	GetRedirectFilterErr error
 
-	// CreateTapErr is an error that will be returned from all CreateTap calls
+	// CreateTapErr is an error that will be returned from all CreateTap calls.
 	CreateTapErr error
 
-	// RemoveLinkErr is an error that will be returned from all RemoveLink calls
+	// RemoveLinkErr is an error that will be returned from all RemoveLink calls.
 	RemoveLinkErr error
-	// RemoveLinkCalls records the args provided to each call to RemoveLink
+
+	// RemoveLinkCalls records the args provided to each call to RemoveLink.
 	RemoveLinkCalls []string
 
-	// GetLinkErr is an error that will be returned from all GetLink calls
+	// GetLinkErr is an error that will be returned from all GetLink calls.
 	GetLinkErr error
 }
 
 var _ NetlinkOps = &MockNetlinkOps{}
 
-// AddIngressQdisc does nothing and returns an error if configured to do so (otherwise nil)
+// AddIngressQdisc does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) AddIngressQdisc(link netlink.Link) error {
 	return m.AddIngressQdiscErr
 }
 
-// GetIngressQdisc does nothing and returns an error if configured to do so (otherwise nil)
+// GetIngressQdisc does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) GetIngressQdisc(sourceLink netlink.Link) (netlink.Qdisc, error) {
 	return nil, m.GetIngressQdiscErr
 }
 
-// RemoveIngressQdisc does nothing and returns an error if configured to do so (otherwise nil)
+// RemoveIngressQdisc does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) RemoveIngressQdisc(sourceLink netlink.Link) error {
 	m.RemoveIngressQdiscCalls = append(m.RemoveIngressQdiscCalls, sourceLink)
+
 	return m.RemoveIngressQdiscErr
 }
 
-// AddRedirectFilter does nothing and returns an error if configured to do so (otherwise nil)
+// AddRedirectFilter does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) AddRedirectFilter(sourceLink netlink.Link, targetLink netlink.Link) error {
 	return m.AddRedirectFilterErr
 }
 
-// GetRedirectFilter does nothing and returns an error if configured to do so (otherwise nil)
+// GetRedirectFilter does nothing and returns an error if configured to do so (otherwise nil).
 func (m *MockNetlinkOps) GetRedirectFilter(sourceLink netlink.Link, targetLink netlink.Link) (netlink.Filter, error) {
 	return nil, m.GetRedirectFilterErr
 }
 
 // GetLink returns CreatedTap if provided the name of CreatedTap, RedirectIface if provided the name
-// of RedirectIface or otherwise a netlink.LinkNotFoundError
+// of RedirectIface or otherwise a netlink.LinkNotFoundError.
 func (m *MockNetlinkOps) GetLink(name string) (netlink.Link, error) {
 	if m.GetLinkErr != nil {
 		return nil, m.GetLinkErr
@@ -109,6 +112,7 @@ func (m *MockNetlinkOps) RemoveLink(name string) error {
 	}
 
 	m.RemoveLinkCalls = append(m.RemoveLinkCalls, name)
+
 	switch name {
 	case m.RedirectIface.Attrs().Name:
 		return nil
@@ -119,12 +123,12 @@ func (m *MockNetlinkOps) RemoveLink(name string) error {
 	}
 }
 
-// CreateTap returns the configured mock tap link and/or a configured error
+// CreateTap returns the configured mock tap link and/or a configured error.
 func (m *MockNetlinkOps) CreateTap(name string, mtu int, ownerUID, ownerGID int) (netlink.Link, error) {
 	return m.CreatedTap, m.CreateTapErr
 }
 
-// MockLink provides a mocked out netlink.Link implementation
+// MockLink provides a mocked out netlink.Link implementation.
 type MockLink struct {
 	netlink.Link
 	netlink.LinkAttrs
@@ -132,7 +136,7 @@ type MockLink struct {
 
 var _ netlink.Link = &MockLink{}
 
-// Attrs() returns the LinkAttrs configured in the MockLink object
+// Attrs() returns the LinkAttrs configured in the MockLink object.
 func (l MockLink) Attrs() *netlink.LinkAttrs {
 	return &l.LinkAttrs
 }
@@ -146,12 +150,12 @@ type MockNetNS struct {
 
 var _ ns.NetNS = &MockNetNS{}
 
-// Do executes the provided callback in the host's netns (it does not actually switch ns)
+// Do executes the provided callback in the host's netns (it does not actually switch ns).
 func (m MockNetNS) Do(f func(ns.NetNS) error) error {
 	return f(nil)
 }
 
-// Path returns the configured MockPath object in the MockNetNS object
+// Path returns the configured MockPath object in the MockNetNS object.
 func (m MockNetNS) Path() string {
 	return m.MockPath
 }

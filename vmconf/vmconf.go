@@ -12,19 +12,19 @@
 // permissions and limitations under the License.
 
 /*
- Package vmconf defines an interface for converting particular CNI invocation
- results to networking configuration usable by a VM. It expects the CNI result
- to have the following properties:
- * The results should contain an interface for a tap device, which will be used
-   as the VM's tap device.
- * The results should contain an interface with the same name as the tap device
-   but with sandbox ID set to the containerID provided during CNI invocation.
-   This should be a "pseudo-interface", not one that has actually been created.
-   It represents the configuration that should be applied to the VM internally.
-   The CNI "containerID" is, in this case, used more as a "vmID" to represent
-   the VM's internal network interface.
-     * If the CNI results specify an IP associated with this interface, that IP
-       should be used to statically configure the VM's internal network interface.
+Package vmconf defines an interface for converting particular CNI invocation
+results to networking configuration usable by a VM. It expects the CNI result
+to have the following properties:
+  - The results should contain an interface for a tap device, which will be used
+    as the VM's tap device.
+  - The results should contain an interface with the same name as the tap device
+    but with sandbox ID set to the containerID provided during CNI invocation.
+    This should be a "pseudo-interface", not one that has actually been created.
+    It represents the configuration that should be applied to the VM internally.
+    The CNI "containerID" is, in this case, used more as a "vmID" to represent
+    the VM's internal network interface.
+  - If the CNI results specify an IP associated with this interface, that IP
+    should be used to statically configure the VM's internal network interface.
 */
 package vmconf
 
@@ -36,7 +36,7 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 
-	"github.com/awslabs/tc-redirect-tap/internal"
+	"github.com/appfactory-hq/tc-redirect-tap/internal"
 )
 
 // StaticNetworkConf holds the configuration needed to configure a VM's networking
@@ -88,13 +88,15 @@ type StaticNetworkConf struct {
 //
 // Due to the limitation of "ip=", not all configuration specified in StaticNetworkConf can be
 // applied automatically. In particular:
-// * The MacAddr and MTU cannot be applied
-// * The only routes created will match what's specified in VMIPConfig; VMRoutes will be ignored.
-// * Only up to two namesevers can be supplied. If VMNameservers is has more than 2 entries, only
-//   the first two in the slice will be applied in the VM.
-// * VMDomain, VMSearchDomains and VMResolverOptions will be ignored
-// * Nameserver settings are also only set in /proc/net/pnp. Most applications will thus require
-//   /etc/resolv.conf to be a symlink to /proc/net/pnp in order to resolve names as expected.
+//   - The MacAddr and MTU cannot be applied
+//   - The only routes created will match what's specified in VMIPConfig; VMRoutes will be ignored.
+//   - Only up to two namesevers can be supplied. If VMNameservers is has more than 2 entries, only
+//     the first two in the slice will be applied in the VM.
+//   - VMDomain, VMSearchDomains and VMResolverOptions will be ignored
+//   - Nameserver settings are also only set in /proc/net/pnp. Most applications will thus require
+//     /etc/resolv.conf to be a symlink to /proc/net/pnp in order to resolve names as expected.
+//
+// nolint:wsl
 func (c StaticNetworkConf) IPBootParam() string {
 	// See "ip=" section of kernel linked above for details on each field listed below.
 
@@ -127,7 +129,7 @@ func (c StaticNetworkConf) IPBootParam() string {
 
 	// up to two nameservers (if any were provided)
 	var nameservers [2]string
-	copy(nameservers[:], c.VMNameservers)
+	_ = copy(nameservers[:], c.VMNameservers)
 
 	// TODO(sipsma) should we support configuring an NTP server?
 	const ntpServer = ""
@@ -163,7 +165,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 	vmIface, tapIface, err := internal.VMTapPair(currentResult, vmIfaceSandbox)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find vm/tap pair: %w", err)
 	}
 
 	// find the IP associated with the VM iface
@@ -172,6 +174,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 		return nil, fmt.Errorf("expected to find 1 IP for vm interface %q, but instead found %+v",
 			vmIface.Name, vmIPs)
 	}
+
 	vmIP := vmIPs[0]
 
 	netNS, err := ns.GetNS(tapIface.Sandbox)
@@ -181,7 +184,7 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 	tapMTU, err := mtuOf(tapIface.Name, netNS, internal.DefaultNetlinkOps())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find MTU of tap device: %w", err)
 	}
 
 	return &StaticNetworkConf{
@@ -200,16 +203,17 @@ func StaticNetworkConfFrom(result types.Result, containerID string) (*StaticNetw
 
 func mtuOf(ifaceName string, netNS ns.NetNS, netlinkOps internal.NetlinkOps) (int, error) {
 	var mtu int
-	err := netNS.Do(func(_ ns.NetNS) error {
+
+	if err := netNS.Do(func(_ ns.NetNS) error {
 		link, err := netlinkOps.GetLink(ifaceName)
 		if err != nil {
 			return fmt.Errorf("failed to find device %q in netns %q: %w", ifaceName, netNS.Path(), err)
 		}
+
 		mtu = link.Attrs().MTU
 
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return 0, fmt.Errorf("failed to find MTU: %w", err)
 	}
 

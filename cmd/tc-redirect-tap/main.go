@@ -21,16 +21,14 @@ import (
 	"strconv"
 	"strings"
 
+	pluginargs "github.com/appfactory-hq/tc-redirect-tap/cmd/tc-redirect-tap/args"
+	"github.com/appfactory-hq/tc-redirect-tap/internal"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/buildversion"
-	"github.com/hashicorp/go-multierror"
-
-	pluginargs "github.com/awslabs/tc-redirect-tap/cmd/tc-redirect-tap/args"
-	"github.com/awslabs/tc-redirect-tap/internal"
 )
 
 func main() {
@@ -49,7 +47,7 @@ func main() {
 func add(args *skel.CmdArgs) error {
 	p, err := newPlugin(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create plugin: %w", err)
 	}
 
 	if p.netNS == nil {
@@ -62,16 +60,16 @@ func add(args *skel.CmdArgs) error {
 
 	err = p.add()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add tap device: %w", err)
 	}
 
-	return types.PrintResult(p.currentResult, p.currentResult.CNIVersion)
+	return types.PrintResult(p.currentResult, p.currentResult.CNIVersion) // nolint:wrapcheck
 }
 
 func del(args *skel.CmdArgs) error {
 	p, err := newPlugin(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create plugin: %w", err)
 	}
 
 	if p.netNS == nil {
@@ -80,13 +78,13 @@ func del(args *skel.CmdArgs) error {
 		return nil
 	}
 
-	return p.del()
+	return p.del() // nolint:wrapcheck
 }
 
 func check(args *skel.CmdArgs) error {
 	p, err := newPlugin(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create plugin: %w", err)
 	}
 
 	if p.netNS == nil {
@@ -97,7 +95,7 @@ func check(args *skel.CmdArgs) error {
 		return &NoPreviousResultError{}
 	}
 
-	return p.check()
+	return p.check() // nolint:wrapcheck
 }
 
 func newPlugin(args *skel.CmdArgs) (*plugin, error) {
@@ -106,25 +104,19 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 	}
 
 	netNS, err := ns.GetNS(args.Netns)
-	if err != nil {
-		// It's valid for the netns to no longer exist during DEL commands (in which case DEL is
-		// a noop). Thus, we leave validating that netNS is not nil to command implementations.
-		switch err.(type) {
-		case ns.NSPathNotExistErr:
-			netNS = nil
-		default:
-			return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
-		}
+	if err != nil && !errors.Is(err, ns.NSPathNotExistErr{}) {
+		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
+	} else if errors.Is(err, ns.NSPathNotExistErr{}) {
+		netNS = nil
 	}
 
+	var noPreviousResultError *NoPreviousResultError
+
 	currentResult, err := getCurrentResult(args)
-	if err != nil {
-		switch err.(type) {
-		case *NoPreviousResultError:
-			currentResult = nil
-		default:
-			return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
-		}
+	if err != nil && !errors.As(err, &noPreviousResultError) {
+		return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
+	} else if errors.As(err, &noPreviousResultError) {
+		currentResult = nil
 	}
 
 	plugin := &plugin{
@@ -141,9 +133,10 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 
 		currentResult: currentResult,
 	}
+
 	parsedArgs, err := extractArgs(args.Args)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse CNI arguments: %w", err)
 	}
 
 	if tapName, wasDefined := parsedArgs[pluginargs.TCRedirectTapName]; wasDefined {
@@ -155,6 +148,7 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 		if err != nil {
 			return nil, fmt.Errorf("tapUID should be numeric convertible, got %q: %w", tapUIDVal, err)
 		}
+
 		plugin.tapUID = tapUID
 	}
 
@@ -163,6 +157,7 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 		if err != nil {
 			return nil, fmt.Errorf("tapGID should be numeric convertible, got %q: %w", tapGIDVal, err)
 		}
+
 		plugin.tapGID = tapGID
 	}
 
@@ -172,13 +167,12 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 func getCurrentResult(args *skel.CmdArgs) (*current.Result, error) {
 	// parse the previous CNI result (or throw an error if there wasn't one)
 	cniConf := types.NetConf{}
-	err := json.Unmarshal(args.StdinData, &cniConf)
-	if err != nil {
+
+	if err := json.Unmarshal(args.StdinData, &cniConf); err != nil {
 		return nil, fmt.Errorf("failure checking for previous result output: %w", err)
 	}
 
-	err = version.ParsePrevResult(&cniConf)
-	if err != nil {
+	if err := version.ParsePrevResult(&cniConf); err != nil {
 		return nil, fmt.Errorf("failed to parse previous CNI result: %w", err)
 	}
 
@@ -199,33 +193,34 @@ type plugin struct {
 
 	// vmID is the sandbox ID used to specify the interface that should be created
 	// and configured for the VM internally (the CNI spec allows the sandbox ID to
-	// be a hypervisor/VM ID in addition to a network namespace path)
+	// be a hypervisor/VM ID in addition to a network namespace path).
 	vmID string
 
 	// tapName is the name that the VM's tap device will be created with. If it's
-	// unset, it will be with a name decided automatically by the kernel
+	// unset, it will be with a name decided automatically by the kernel.
 	tapName string
 
-	// tapUID is the uid of the user-owner of the tap device
+	// tapUID is the uid of the user-owner of the tap device.
 	tapUID int
 
-	// tapGID is the gid of the group-owner of the tap device
+	// tapGID is the gid of the group-owner of the tap device.
 	tapGID int
 
 	// redirectInterfaceName is the name of the device that the tap device will have a
 	// u32 redirect filter pair with. It's provided by the client via the CNI runtime
-	// config "IfName" parameter
+	// config "IfName" parameter.
 	redirectInterfaceName string
 
 	// netNS is the network namespace in which the redirectIface exists and thus in which
-	// the tap device will be created too
+	// the tap device will be created too.
 	netNS ns.NetNS
 
 	// currentResult is the CNI result object, initialized to the previous CNI
-	// result if there was any or to nil if there was no previous result provided
+	// result if there was any or to nil if there was no previous result provided.
 	currentResult *current.Result
 }
 
+// nolint:wrapcheck
 func (p plugin) add() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
@@ -238,27 +233,27 @@ func (p plugin) add() error {
 
 		tapLink, err := p.CreateTap(p.tapName, redirectLink.Attrs().MTU, p.tapUID, p.tapGID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create tap device: %w", err)
 		}
 
 		err = p.AddIngressQdisc(tapLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add ingress qdisc to tap device: %w", err)
 		}
 
 		err = p.AddIngressQdisc(redirectLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add ingress qdisc to redirect interface: %w", err)
 		}
 
 		err = p.AddRedirectFilter(tapLink, redirectLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add redirect filter to tap device: %w", err)
 		}
 
 		err = p.AddRedirectFilter(redirectLink, tapLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add redirect filter to redirect interface: %w", err)
 		}
 
 		// Add the tap device to our results
@@ -297,101 +292,87 @@ func (p plugin) add() error {
 	})
 }
 
+// nolint:wrapcheck
 func (p plugin) del() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
-		var multiErr *multierror.Error
+		var (
+			linkNotFoundError  *internal.LinkNotFoundError
+			qdiscNotFoundError *internal.QdiscNotFoundError
+			multiErr           error
+		)
 
 		// try to remove the qdisc we added from the redirect interface
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
-		switch err.(type) {
-
-		case nil:
-			// the link exists, so try removing the qdisc
-			err := p.RemoveIngressQdisc(redirectLink)
-			switch err.(type) {
-			case nil, *internal.QdiscNotFoundError:
-				// we removed successfully or there already wasn't a qdisc, nothing to do
-			default:
-				multiErr = multierror.Append(multiErr,
-					fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
-				)
-			}
-
-		case *internal.LinkNotFoundError:
-			// if the link doesn't exist, there's nothing to do
-
-		default:
-			multiErr = multierror.Append(multiErr,
+		if err != nil && !errors.As(err, &linkNotFoundError) {
+			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failure finding device %q: %w", p.redirectInterfaceName, err),
+			)
+		}
+
+		// the link exists, so try removing the qdisc
+		if err := p.RemoveIngressQdisc(redirectLink); err != nil && !errors.As(err, &qdiscNotFoundError) {
+			multiErr = errors.Join(multiErr,
+				fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
 			)
 		}
 
 		// if there was no previous result, we can't find the vm-tap pair, so we are done here
 		if p.currentResult == nil {
-			return multiErr.ErrorOrNil()
+			return multiErr
 		}
 
 		// try to remove the tap device we added
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
-		switch err.(type) {
-
-		case nil:
-			err = p.RemoveLink(tapIface.Name)
-			switch err.(type) {
-			case nil, *internal.LinkNotFoundError:
-				// we removed successfully or someone else beat us to removing it first
-			default:
-				multiErr = multierror.Append(multiErr,
-					fmt.Errorf("failure removing device %q: %w", tapIface.Name, err),
-				)
-			}
-
-		case *internal.LinkNotFoundError:
-			// if the link doesn't exist, there's nothing to do
-
-		default:
-			multiErr = multierror.Append(multiErr, err)
+		if err != nil && !errors.As(err, &linkNotFoundError) {
+			multiErr = errors.Join(multiErr, err)
 		}
 
-		return multiErr.ErrorOrNil()
+		if err = p.RemoveLink(tapIface.Name); err != nil && !errors.As(err, &linkNotFoundError) {
+			multiErr = errors.Join(multiErr,
+				fmt.Errorf("failed to remove device %q: %w", tapIface.Name, err),
+			)
+		}
+
+		return multiErr
 	})
 }
 
+// nolint:wrapcheck
 func (p plugin) check() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find vm/tap pair: %w", err)
 		}
 
 		tapLink, err := p.GetLink(tapIface.Name)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find tap device %q: %w", tapIface.Name, err)
 		}
 
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find redirect interface %q: %w", p.redirectInterfaceName, err)
 		}
 
 		_, err = p.GetIngressQdisc(tapLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find ingress qdisc on tap device %q: %w", tapLink.Attrs().Name, err)
 		}
 
 		_, err = p.GetIngressQdisc(redirectLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find ingress qdisc on redirect interface %q: %w", redirectLink.Attrs().Name, err)
 		}
 
 		_, err = p.GetRedirectFilter(tapLink, redirectLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find redirect filter on tap device %q: %w", tapLink.Attrs().Name, err)
 		}
 
 		_, err = p.GetRedirectFilter(redirectLink, tapLink)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find redirect filter on redirect interface %q: %w", redirectLink.Attrs().Name, err)
 		}
 
 		return nil
@@ -405,16 +386,20 @@ func (e NoPreviousResultError) Error() string {
 }
 
 // extractArgs returns cli args in form of map of strings
-// args string - cli args string("key1=val1;key2=val2)
+// args string - cli args string("key1=val1;key2=val2).
 func extractArgs(args string) (map[string]string, error) {
 	result := make(map[string]string)
+
 	if args != "" {
 		argumentsPairs := strings.Split(args, ";")
+
 		for _, pairStr := range argumentsPairs {
 			pair := strings.SplitN(pairStr, "=", 2)
+
 			if len(pair) < 2 {
 				return result, fmt.Errorf("Invalid cni arguments format, %q", pairStr)
 			}
+
 			result[pair[0]] = pair[1]
 		}
 	}
