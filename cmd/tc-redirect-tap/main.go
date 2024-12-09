@@ -29,7 +29,6 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/buildversion"
-	"github.com/hashicorp/go-multierror"
 )
 
 func main() {
@@ -290,41 +289,41 @@ func (p plugin) add() error {
 // nolint:wrapcheck
 func (p plugin) del() error {
 	return p.netNS.Do(func(_ ns.NetNS) error {
-		var multiErr *multierror.Error
+		var multiErr error
 
 		// try to remove the qdisc we added from the redirect interface
 		redirectLink, err := p.GetLink(p.redirectInterfaceName)
 		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
-			multiErr = multierror.Append(multiErr,
+			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failure finding device %q: %w", p.redirectInterfaceName, err),
 			)
 		}
 
 		// the link exists, so try removing the qdisc
 		if err := p.RemoveIngressQdisc(redirectLink); err != nil && !errors.Is(err, &internal.QdiscNotFoundError{}) {
-			multiErr = multierror.Append(multiErr,
+			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failed to remove ingres qdisc from %q: %w", redirectLink.Attrs().Name, err),
 			)
 		}
 
 		// if there was no previous result, we can't find the vm-tap pair, so we are done here
 		if p.currentResult == nil {
-			return multiErr.ErrorOrNil()
+			return multiErr
 		}
 
 		// try to remove the tap device we added
 		_, tapIface, err := internal.VMTapPair(p.currentResult, p.vmID)
 		if err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
-			multiErr = multierror.Append(multiErr, err)
+			multiErr = errors.Join(multiErr, err)
 		}
 
 		if err = p.RemoveLink(tapIface.Name); err != nil && !errors.Is(err, &internal.LinkNotFoundError{}) {
-			multiErr = multierror.Append(multiErr,
+			multiErr = errors.Join(multiErr,
 				fmt.Errorf("failed to remove device %q: %w", tapIface.Name, err),
 			)
 		}
 
-		return multiErr.ErrorOrNil()
+		return multiErr
 	})
 }
 
