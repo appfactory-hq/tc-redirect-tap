@@ -106,11 +106,15 @@ func newPlugin(args *skel.CmdArgs) (*plugin, error) {
 	netNS, err := ns.GetNS(args.Netns)
 	if err != nil && !errors.Is(err, ns.NSPathNotExistErr{}) {
 		return nil, fmt.Errorf("failed to open netns at path %q: %w", args.Netns, err)
+	} else if errors.Is(err, ns.NSPathNotExistErr{}) {
+		netNS = nil
 	}
 
 	currentResult, err := getCurrentResult(args)
 	if err != nil && !errors.Is(err, &NoPreviousResultError{}) {
 		return nil, fmt.Errorf("failure parsing previous CNI result: %w", err)
+	} else if errors.Is(err, &NoPreviousResultError{}) {
+		currentResult = nil
 	}
 
 	plugin := &plugin{
