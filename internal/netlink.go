@@ -181,7 +181,7 @@ func (ops defaultNetlinkOps) GetRedirectFilter(sourceLink netlink.Link, targetLi
 
 func (defaultNetlinkOps) GetLink(name string) (netlink.Link, error) {
 	link, err := netlink.LinkByName(name)
-	if _, ok := err.(netlink.LinkNotFoundError); ok {
+	if errors.As(err, &netlink.LinkNotFoundError{}) {
 		return nil, &LinkNotFoundError{device: name}
 	}
 
@@ -195,7 +195,7 @@ func (ops defaultNetlinkOps) RemoveLink(name string) error {
 	}
 
 	err = netlink.LinkDel(link)
-	if _, ok := err.(netlink.LinkNotFoundError); ok {
+	if errors.As(err, &netlink.LinkNotFoundError{}) {
 		return &LinkNotFoundError{device: link.Attrs().Name}
 	}
 
